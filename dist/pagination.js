@@ -4,51 +4,52 @@ exports.queryPaginate = queryPaginate;
 exports.queryBuilder = queryBuilder;
 exports.queryRepository = queryRepository;
 const typeorm_1 = require("typeorm");
+const CacheTime = 60 * 1 * 1000; // 1 minute
 async function queryPaginate(params) {
-    const { query, options, where, order } = params;
+    const { select, query, options, queryRepositoryOption } = params;
     return query instanceof typeorm_1.Repository
-        ? queryRepository(query, options, where, order)
-        : queryBuilder(query, options);
+        ? queryRepository(query, options, queryRepositoryOption)
+        : queryBuilder(select, query, options);
 }
-async function queryBuilder(query, options) {
+async function queryBuilder(select, query, options) {
     const { page, limit } = options;
     const _page = page > 0 ? page : 1;
     const _limit = limit > 0 ? limit : 10;
     const [data, totalItems] = await query
+        .select(select)
         .skip((_page - 1) * _limit)
         .take(_limit)
-        .cache(true)
+        .cache(CacheTime)
         .getManyAndCount();
     return {
         data,
         meta: {
             totalItems,
             itemCount: data.length,
-            itemsPerPage: _limit,
+            itemsPerPage: Number(_limit),
             totalPages: Math.ceil(totalItems / _limit),
-            currentPage: _page,
+            currentPage: Number(_page),
         },
     };
 }
-async function queryRepository(query, options, where, order) {
+async function queryRepository(query, options, queryRepositoryOptions) {
     const { page, limit } = options;
     const _page = page > 0 ? page : 1;
     const _limit = limit > 0 ? limit : 10;
     const [data, totalItems] = await query.findAndCount({
+        ...queryRepositoryOptions,
         skip: (_page - 1) * _limit,
         take: _limit,
-        where,
-        order,
-        cache: true,
+        cache: CacheTime,
     });
     return {
         data,
         meta: {
             totalItems,
             itemCount: data.length,
-            itemsPerPage: _limit,
+            itemsPerPage: Number(_limit),
             totalPages: Math.ceil(totalItems / _limit),
-            currentPage: _page,
+            currentPage: Number(_page),
         },
     };
 }

@@ -8,7 +8,7 @@ Smart Pagination is a lightweight TypeScript helper for TypeORM projects that ne
 - Ships with a Swagger-ready DTO (`RequestPagination`)
 - Normalises and defaults pagination input (`page = 1`, `limit = 10`)
 - Returns typed pagination metadata alongside your data
-- Enables TypeORM caching by default for paginated queries
+- Enables TypeORM caching with a 60-second TTL for paginated queries
 
 ## Requirements
 
@@ -92,7 +92,7 @@ Internally delegates to `queryRepository` when a repository instance is supplied
 
 - **query**: TypeORM `SelectQueryBuilder<T>`
 - **options**: `{ page: number; limit: number }`
-- Applies `.skip`, `.take`, `.cache(true)`, then resolves via `getManyAndCount`.
+- Applies `.skip`, `.take`, `.cache(60 * 1000)`, then resolves via `getManyAndCount`.
 
 ### `queryRepository(query, options, where?, order?)`
 
@@ -128,7 +128,8 @@ interface IPaginationResult<T> {
 
 ## Tips
 
-- TypeORM caching is enabled (`cache: true`) on every call. Adjust your global cache configuration if you need a different cache behaviour.
+- TypeORM caching is enabled with a 60-second TTL (`cache: 60 * 1000`) on every call. Adjust your global cache configuration if you need a different cache behaviour.
+- Helper metadata values are normalised to numbers, so `meta.itemsPerPage` and `meta.currentPage` always return numeric types.
 - If you accept pagination parameters from query strings, remember that they arrive as strings. Perform `Number(...)` conversion or use `class-transformer` to coerce values.
 - For complex filters, pass a TypeORM query builder to keep full control over joins and projections.
 

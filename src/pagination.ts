@@ -2,29 +2,49 @@ import {
   Repository,
   ObjectLiteral,
   SelectQueryBuilder,
-  FindOptionsWhere,
-  FindOptionsOrder,
+  FindManyOptions,
 } from "typeorm";
 import { IPaginate, IPaginationResult } from "./pagination.interface";
 
+/**
+ * Cache time in milliseconds
+ */
+const CacheTime = 60 * 1 * 1000; // 1 minute
+
 interface IQueryPaginate<T extends ObjectLiteral> {
+  /**
+   * Select fields to be returned
+   */
+  select: string[];
+
+  /**
+   * TypeORM Repository or QueryBuilder instance
+   */
   query: Repository<T> | SelectQueryBuilder<T>;
+
+  /**
+   * Pagination options
+   */
   options: IPaginate;
-  where?: FindOptionsWhere<T>;
-  order?: FindOptionsOrder<T>;
+
+  /**
+   * Additional options for repository queries
+   */
+  queryRepositoryOption?: FindManyOptions<T>;
 }
 
 export async function queryPaginate<T extends ObjectLiteral>(
   params: IQueryPaginate<T>
 ): Promise<IPaginationResult<T>> {
-  const { query, options, where, order } = params;
+  const { select, query, options, queryRepositoryOption } = params;
 
   return query instanceof Repository
-    ? queryRepository<T>(query, options, where, order)
-    : queryBuilder<T>(query, options);
+    ? queryRepository<T>(query, options, queryRepositoryOption)
+    : queryBuilder<T>(select, query, options);
 }
 
 export async function queryBuilder<T extends ObjectLiteral>(
+  select: string[],
   query: SelectQueryBuilder<T>,
   options: IPaginate
 ): Promise<IPaginationResult<T>> {
@@ -34,9 +54,10 @@ export async function queryBuilder<T extends ObjectLiteral>(
   const _limit = limit > 0 ? limit : 10;
 
   const [data, totalItems] = await query
+    .select(select)
     .skip((_page - 1) * _limit)
     .take(_limit)
-    .cache(true)
+    .cache(CacheTime)
     .getManyAndCount();
 
   return {
@@ -44,9 +65,9 @@ export async function queryBuilder<T extends ObjectLiteral>(
     meta: {
       totalItems,
       itemCount: data.length,
-      itemsPerPage: _limit,
+      itemsPerPage: Number(_limit),
       totalPages: Math.ceil(totalItems / _limit),
-      currentPage: _page,
+      currentPage: Number(_page),
     },
   };
 }
@@ -54,8 +75,7 @@ export async function queryBuilder<T extends ObjectLiteral>(
 export async function queryRepository<T extends ObjectLiteral>(
   query: Repository<T>,
   options: IPaginate,
-  where?: FindOptionsWhere<T>,
-  order?: FindOptionsOrder<T>
+  queryRepositoryOptions?: FindManyOptions<T>
 ): Promise<IPaginationResult<T>> {
   const { page, limit } = options;
 
@@ -63,20 +83,19 @@ export async function queryRepository<T extends ObjectLiteral>(
   const _limit = limit > 0 ? limit : 10;
 
   const [data, totalItems] = await query.findAndCount({
+    ...queryRepositoryOptions,
     skip: (_page - 1) * _limit,
     take: _limit,
-    where,
-    order,
-    cache: true,
+    cache: CacheTime,
   });
   return {
     data,
     meta: {
       totalItems,
       itemCount: data.length,
-      itemsPerPage: _limit,
+      itemsPerPage: Number(_limit),
       totalPages: Math.ceil(totalItems / _limit),
-      currentPage: _page,
+      currentPage: Number(_page),
     },
   };
 }
